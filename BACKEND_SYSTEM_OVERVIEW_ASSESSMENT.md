@@ -7,21 +7,21 @@
 
 ## 1. Kết luận điều hành
 
-FixTrack Backend đã hoàn thiện ở mức **implementation/P1**, đủ làm backend chuẩn để frontend tích hợp theo API contract. Các luồng nghiệp vụ trọng tâm, phân quyền, state machine, vật tư, hàng chờ, thông báo và audit đã được hiện thực; PostgreSQL và Alembic đã được kiểm chứng thực tế.
+FixTrack Backend đã hoàn thiện ở mức **implementation/P1**, đủ điều kiện được sử dụng làm nguồn API contract chính thức cho quá trình tích hợp frontend. Các luồng nghiệp vụ trọng tâm, phân quyền, state machine, vật tư, hàng chờ, thông báo và audit đã được hiện thực; PostgreSQL và Alembic đã được kiểm chứng thực tế.
 
 Hệ thống hiện **sẵn sàng cho môi trường development, integration và staging**. Để gọi là production-ready hoàn toàn, cần thêm một vòng hardening vận hành, chủ yếu ở quản lý secret, startup container, health/readiness, quan sát hệ thống và test PostgreSQL/concurrency chuyên sâu.
 
 ## 2. Kết quả kiểm chứng
 
-- Regression test: **26/26 passed** trong 1,62 giây.
-- Python compile: đạt, không có lỗi cú pháp/import trong `app` và `alembic`.
+- Regression test: **26/26 passed** trong 1,62 giây. Bộ regression hiện tập trung vào các luồng nghiệp vụ và lỗi P0/P1 đã xác định; kết quả này không thay thế kiểm thử tải, bảo mật và concurrency chuyên sâu trước production.
+- Python compile đạt; không phát hiện lỗi cú pháp trong `app` và `alembic`. Các import chính được xác nhận thêm thông qua quá trình chạy test và khởi động ứng dụng thực tế.
 - Docker Compose validation: đạt.
 - PostgreSQL 15 deployment trước khi tách repo: health API trả HTTP 200.
 - Alembic staging: `upgrade -> downgrade -> upgrade` thành công.
 - Database chính đã nâng tới revision `20260711_0002`.
 - Partial unique index `ix_queue_active_request_stage` đã tồn tại đúng điều kiện trên PostgreSQL.
 - Audit dữ liệu trước migration không phát hiện queue active trùng hoặc inventory ledger mơ hồ.
-- Backup trước migration đã được lưu trong repository tài liệu.
+- Backup trước migration đã được tạo và kiểm tra. Repository tài liệu chỉ lưu bản ghi xác nhận; tệp dump thực tế phải được lưu trong khu vực bảo mật riêng, không track bằng Git.
 
 ## 3. Kiến trúc và công nghệ
 
@@ -75,7 +75,7 @@ Hệ thống hiện **sẵn sàng cho môi trường development, integration v�
 
 ### Thông báo, audit và lỗi API
 
-- Có notification model/schema/route và event-driven notification cơ bản.
+- Có notification model/schema/route và cơ chế tạo thông báo đồng bộ theo các sự kiện nghiệp vụ chính.
 - Audit log bao phủ các mutation quan trọng.
 - Business error có mã lỗi cấu trúc để frontend xử lý ổn định.
 - Integrity error được chuẩn hóa thành HTTP 409.
@@ -141,3 +141,30 @@ Trạng thái nên ghi nhận chính thức là:
 > **P1 implementation complete; integration/staging ready; production hardening pending.**
 
 Ba việc cần chốt trước production là bắt buộc secret an toàn, tách seed khỏi startup và dùng runtime không có `--reload`. Sau đó mới triển khai observability, readiness và CI/PostgreSQL concurrency test theo mức ưu tiên vận hành.
+
+## 9. Kế hoạch hardening và tiêu chí chấp thuận production
+
+### Đợt 1 — Runtime an toàn
+
+- Ứng dụng từ chối khởi động khi JWT secret thiếu, yếu hoặc còn giá trị mặc định.
+- Image production chạy không có `--reload`; số worker và timeout được cấu hình theo môi trường.
+- Migration và seed là tác vụ triển khai riêng; startup ứng dụng không tự seed dữ liệu.
+- CORS production chỉ cho phép các origin đã phê duyệt.
+
+### Đợt 2 — Khả năng vận hành
+
+- Có liveness và readiness riêng; readiness xác minh kết nối PostgreSQL.
+- Log có cấu trúc, correlation/trace ID và không chứa secret hoặc dữ liệu nhạy cảm.
+- Có metrics tối thiểu cho request rate, latency, error rate, DB pool và migration status.
+- Có cảnh báo cho health failure, tỷ lệ lỗi tăng và tài nguyên database bất thường.
+
+### Đợt 3 — Kiểm chứng phát hành
+
+- CI bắt buộc chạy regression test, migration check và static checks trước merge.
+- Có test PostgreSQL integration/concurrency cho queue, inventory và các mutation idempotent.
+- Hoàn tất security test cho auth, authorization, upload và rate limiting.
+- Thực hiện backup/restore drill và diễn tập rollback migration trên bản sao dữ liệu.
+
+### Tiêu chí phê duyệt cuối
+
+Production chỉ được phê duyệt khi toàn bộ P0 đóng, không còn lỗi security mức critical/high, migration và rollback đạt trên staging tương đương production, backup đã restore thử thành công, dashboard/cảnh báo hoạt động và có người chịu trách nhiệm rollback. Cho tới thời điểm đó, trạng thái chính thức vẫn là **integration/staging ready; production hardening pending**.
