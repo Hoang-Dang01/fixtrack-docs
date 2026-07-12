@@ -1,8 +1,10 @@
 # FixTrack Backend — Production Hardening Roadmap
 
-**Trạng thái:** Approved  
-**Phạm vi:** Backend only  
-**Phạm vi thực thi ngay:** Giai đoạn 1–3  
+**Trạng thái:** Approved
+
+**Phạm vi:** Backend only
+
+**Phạm vi thực thi ngay:** Giai đoạn 1–3
 **Ngoài phạm vi:** Frontend, thay đổi stack, mở rộng nghiệp vụ và refresh-token.
 
 ## 1. Mục tiêu và nguyên tắc trạng thái
